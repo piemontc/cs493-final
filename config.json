@@ -1,0 +1,4 @@
+{
+  "GCLOUD_PROJECT": "piemo-project",
+  "DATA_BACKEND": "datastore"
+}
