@@ -46,7 +46,7 @@ function post_exercise(name, category, equipment, user) {
   return datastore.save({"key":key, "data":new_exercise}).then(() => {return key})
 }
 
-function update_exercise(exercise, name, category, equipment) {
+function update_exercise(id, exercise, name, category, equipment) {
   const key = datastore.key([EXERCISES, parseInt(id,10)])
   const new_exercise = {
     "name": name,
@@ -124,8 +124,8 @@ function post_workout(name, category, date, user) {
   return datastore.save({"key":key, "data":new_workout}).then(() => {return key})
 }
 
-function update_workout(workout, name, category, date) {
-  const key = datastore.key([WORKOUTS, parseInt(workout.id,10)])
+function update_workout(id, workout, name, category, date) {
+  const key = datastore.key([WORKOUTS, parseInt(id,10)])
   const new_workout = {
     "name": name,
     "category": category,
@@ -215,6 +215,8 @@ function get_entity(ent, req){
   var prevNextPrefix = req.protocol + "://" + req.get("host") + req.baseUrl + "?cursor="
 
   var results = []
+
+  var count = datastore.createQuery(ent)
   var q = datastore.createQuery(ent).limit(5)
 
   if(Object.keys(req.query).includes("cursor")) {
@@ -222,18 +224,22 @@ function get_entity(ent, req){
     q = q.start(req.query.cursor)
   }
   
-	return datastore.runQuery(q).then( (entities) => {
-    results.items = entities[0].map(fromDatastore)
+  return datastore.runQuery(count).then((e) => {
+    results.total = e[0].length
 
-    if(typeof previous != 'undefined') {
-      results.previous = previous
-    }
-
-    if(entities[1].moreResults !== datastore.NO_MORE_RESULTS) {
-      results.next = prevNextPrefix + entities[1].endCursor
-    }
-
-    return results
+    return datastore.runQuery(q).then((entities) => {
+      results.items = entities[0].map(fromDatastore)
+  
+      if(typeof previous != 'undefined') {
+        results.previous = previous
+      }
+  
+      if(entities[1].moreResults !== datastore.NO_MORE_RESULTS) {
+        results.next = prevNextPrefix + entities[1].endCursor
+      }
+  
+      return results
+    })
   })
 }
 
@@ -268,7 +274,7 @@ exercisesRouter.get('/', checkJwt, function(req, res) {
     get_entity(EXERCISES, req).then((exercises) => {
       res
         .status(200)
-        .json({"items": exercises.items, "next": exercises.next, "prev": exercises.previous})
+        .json({"total": exercises.total, "items": exercises.items, "next": exercises.next, "prev": exercises.previous})
         .end()
     })
   }
@@ -309,7 +315,7 @@ exercisesRouter.put('/:id', checkJwt, function(req, res) {
       var exercise = exercise[0]
 
       if(exercise.user === req.user.name) {
-        update_exercise(exercise, req.body.name, req.body.category, req.body.equipment)
+        update_exercise(req.params.id, exercise, req.body.name, req.body.category, req.body.equipment)
           .then(() => {
             res.status(204).end()
           }, () => {
@@ -385,7 +391,7 @@ workoutsRouter.get('/', checkJwt, function(req, res) {
     get_entity(WORKOUTS, req).then((workouts) => {
       res
         .status(200)
-        .json({"items": workouts.items, "next": workouts.next, "prev": workouts.previous})
+        .json({"total": workouts.total, "items": workouts.items, "next": workouts.next, "prev": workouts.previous})
         .end()
     })
   }
@@ -426,7 +432,7 @@ workoutsRouter.put('/:id', checkJwt, function(req, res) {
       var workout = workout[0]
 
       if(workout.user === req.user.name) {
-        update_workout(workout, req.body.name, req.body.category, req.body.date)
+        update_workout(req.params.id, workout, req.body.name, req.body.category, req.body.date)
           .then(() => {
             res.status(204).end()
           }, () => {
